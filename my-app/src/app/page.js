@@ -18,24 +18,17 @@ function formatTime(ts) {
 }
 
 export default function Home() {
-  const [roleMode, setRoleMode] = useState(true);
+  const [setupComplete, setSetupComplete] = useState(false);
+  const [mode, setMode] = useState("plain");
   const [role, setRole] = useState(ROLES[0].id);
+  const [setupInput, setSetupInput] = useState("");
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState(() => [
-    {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content:
-        "Ask a question, or toggle Role Mode to switch between persona-based and regular chat.",
-      ts: Date.now(),
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
 
   const listRef = useRef(null);
 
-  const mode = roleMode ? "role" : "plain";
   const activeRole = useMemo(() => ROLES.find((r) => r.id === role) ?? ROLES[0], [role]);
 
   useEffect(() => {
@@ -43,6 +36,68 @@ export default function Home() {
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [messages.length]);
+
+  async function handleSetup() {
+    const trimmed = setupInput.trim();
+    if (!trimmed || isSending) return;
+
+    console.log(`EXPERIMENT SETUP: Mode = ${mode.toUpperCase()}, Role = ${role}`);
+
+    setError(null);
+    setIsSending(true);
+
+    const userMsg = { id: crypto.randomUUID(), role: "user", content: trimmed, ts: Date.now() };
+    setMessages([userMsg]);
+    setSetupComplete(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          message: trimmed,
+          mode,
+          role: mode === "role" ? role : null,
+          history: [],
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const message = data?.error?.message || `Request failed (${res.status})`;
+        throw new Error(message);
+      }
+
+      const assistantText = data?.assistant?.content;
+      if (typeof assistantText !== "string" || assistantText.trim().length === 0) {
+        throw new Error("Invalid response from server.");
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: assistantText,
+          ts: Date.now(),
+        },
+      ]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unexpected error sending message.";
+      setError(msg);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "Sorry — something went wrong sending that message.",
+          ts: Date.now(),
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
+  }
 
   async function sendMessage() {
     const trimmed = input.trim();
@@ -121,6 +176,108 @@ export default function Home() {
     ]);
   }
 
+  // Setup screen for experimenters
+  if (!setupComplete) {
+    return (
+      <div className={styles.page}>
+        <main className={styles.shell}>
+          <header className={styles.header}>
+            <div className={styles.titleBlock}>
+              <div className={styles.titleRow}>
+                <h1 className={styles.title}>AI Chatbot Experiment</h1>
+                <span className={styles.badge}>Setup</span>
+              </div>
+              <p className={styles.subtitle}>Configure the experiment and enter the initial prompt.</p>
+            </div>
+          </header>
+
+          {error ? (
+            <div className={styles.errorBanner} role="alert">
+              <strong className={styles.errorTitle}>Error</strong>
+              <span className={styles.errorText}>{error}</span>
+            </div>
+          ) : null}
+
+          <section className={styles.chat}>
+            <div className={styles.setupForm}>
+              <div className={styles.setupSection}>
+                <h2 className={styles.sectionTitle}>Experiment Configuration</h2>
+
+                <div className={styles.configGroup}>
+                  <label className={styles.configLabel}>Chat Mode</label>
+                  <div className={styles.radioGroup}>
+                    <label className={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        name="mode"
+                        value="plain"
+                        checked={mode === "plain"}
+                        onChange={(e) => setMode(e.target.value)}
+                      />
+                      <span>Plain Mode (No Role)</span>
+                    </label>
+                    <label className={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        name="mode"
+                        value="role"
+                        checked={mode === "role"}
+                        onChange={(e) => setMode(e.target.value)}
+                      />
+                      <span>Role Mode (with Persona)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {mode === "role" && (
+                  <div className={styles.configGroup}>
+                    <label className={styles.selectLabel} htmlFor="roleSelect">
+                      Select Role
+                    </label>
+                    <select
+                      id="roleSelect"
+                      className={styles.select}
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.setupSection}>
+                <h2 className={styles.sectionTitle}>Initial Prompt</h2>
+                <textarea
+                  className={styles.textarea}
+                  value={setupInput}
+                  placeholder="Enter the first prompt to send to the chatbot..."
+                  onChange={(e) => setSetupInput(e.target.value)}
+                  rows={5}
+                  disabled={isSending}
+                />
+              </div>
+
+              <button
+                className={styles.primaryButton}
+                type="button"
+                onClick={handleSetup}
+                disabled={isSending || setupInput.trim().length === 0}
+              >
+                {isSending ? "Starting Experiment…" : "Start Experiment"}
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  // Chat screen for users (after setup)
   return (
     <div className={styles.page}>
       <main className={styles.shell}>
@@ -128,50 +285,12 @@ export default function Home() {
           <div className={styles.titleBlock}>
             <div className={styles.titleRow}>
               <h1 className={styles.title}>AI Chatbot</h1>
-              <span className={styles.badge}>Milestone 1</span>
+              <span className={styles.badge}>Chat</span>
             </div>
-            <p className={styles.subtitle}>
-              Toggle Role Mode to apply one of the preset personas before your question is sent.
-            </p>
+            <p className={styles.subtitle}>Ask questions and chat with the assistant.</p>
           </div>
 
           <div className={styles.controls}>
-            <label className={styles.toggle}>
-              <input
-                type="checkbox"
-                checked={roleMode}
-                onChange={(e) => setRoleMode(e.target.checked)}
-              />
-              <span className={styles.toggleTrack} aria-hidden="true">
-                <span className={styles.toggleThumb} />
-              </span>
-              <span className={styles.toggleLabel}>Role Mode</span>
-            </label>
-
-            <div className={styles.selectWrap}>
-              <label className={styles.selectLabel} htmlFor="roleSelect">
-                Role
-              </label>
-              <select
-                id="roleSelect"
-                className={styles.select}
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                disabled={!roleMode}
-                aria-disabled={!roleMode}
-                title={roleMode ? "" : "Enable Role Mode to choose a role"}
-              >
-                {ROLES.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-              <div className={styles.activeHint}>
-                {roleMode ? `Active: ${activeRole.label}` : "Active: Regular chat"}
-              </div>
-            </div>
-
             <button className={styles.ghostButton} type="button" onClick={clearChat}>
               Clear
             </button>
@@ -207,11 +326,7 @@ export default function Home() {
             <textarea
               className={styles.textarea}
               value={input}
-              placeholder={
-                roleMode
-                  ? `Ask a ${activeRole.label} question…`
-                  : "Ask a question (no role prompt)…"
-              }
+              placeholder="Ask a question…"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {

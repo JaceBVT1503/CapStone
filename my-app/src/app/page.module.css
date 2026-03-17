@@ -388,6 +388,103 @@
   }
 }
 
+.setupForm {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+}
+
+.setupSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.configGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.configLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.radioLabel input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent-2);
+}
+
+.radioLabel input[type="radio"]:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.4);
+  outline-offset: 2px;
+}
+
+.setupForm .primaryButton {
+  align-self: flex-start;
+  margin-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 12px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .controls {
+    margin-left: 0;
+    justify-content: space-between;
+  }
+
+  .selectWrap {
+    min-width: 100%;
+  }
+
+  .composerBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+
+  .setupForm .primaryButton {
+    align-self: stretch;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .page {
     --background: #07080b;
