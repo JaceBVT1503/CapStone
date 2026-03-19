@@ -3,11 +3,41 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 
+
+
+
 const ROLES = [
   { id: "MathTutor", label: "Math Tutor" },
   { id: "WritingGrammarExpert", label: "Writing / Grammar Expert" },
   { id: "SeniorSoftwareEngineerDebugger", label: "Senior Software Engineer (Debugging)" },
 ];
+
+const GRADE_OPTIONS = [
+  { id: "freshman", label: "Freshman" },
+  { id: "sophomore", label: "Sophomore" },
+  { id: "junior", label: "Junior" },
+  { id: "senior", label: "Senior" },
+  { id: "other", label: "Other" },
+];
+
+const AI_EXPERIENCE_OPTIONS = [
+  { id: "yes", label: "Yes" },
+  { id: "no", label: "No" },
+];
+
+const USER_INFO_STORAGE_KEY = "aiChatbotExperiment.userInfo.v1";
+
+function isUserInfoComplete(userInfo) {
+  const { name, grade, major, aiExperience } = userInfo ?? {};
+  const trimmedName = typeof name === "string" ? name.trim() : "";
+  const trimmedMajor = typeof major === "string" ? major.trim() : "";
+  const gradeSet = new Set(GRADE_OPTIONS.map((g) => g.id));
+
+  const isValidGrade = typeof grade === "string" && gradeSet.has(grade);
+  const isValidAiExperience = aiExperience === "yes" || aiExperience === "no";
+
+  return Boolean(trimmedName && trimmedMajor && isValidGrade && isValidAiExperience);
+}
 
 function formatTime(ts) {
   try {
@@ -22,6 +52,10 @@ export default function Home() {
   const [mode, setMode] = useState("plain");
   const [role, setRole] = useState(ROLES[0].id);
   const [setupInput, setSetupInput] = useState("");
+  const [name, setName] = useState("");
+  const [grade, setGrade] = useState("");
+  const [major, setMajor] = useState("");
+  const [aiExperience, setAiExperience] = useState("");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
@@ -30,6 +64,7 @@ export default function Home() {
   const listRef = useRef(null);
 
   const activeRole = useMemo(() => ROLES.find((r) => r.id === role) ?? ROLES[0], [role]);
+  const isUserInfoCompleteValue = isUserInfoComplete({ name, grade, major, aiExperience });
 
   useEffect(() => {
     const el = listRef.current;
@@ -37,11 +72,71 @@ export default function Home() {
     el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
+  useEffect(() => {
+    // Restore saved user info so the user doesn't need to retype it on refresh.
+    try {
+      const raw = localStorage.getItem(USER_INFO_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return;
+
+      setName(typeof parsed.name === "string" ? parsed.name : "");
+      setGrade(typeof parsed.grade === "string" ? parsed.grade : "");
+      setMajor(typeof parsed.major === "string" ? parsed.major : "");
+      setAiExperience(typeof parsed.aiExperience === "string" ? parsed.aiExperience : "");
+    } catch {
+      // If localStorage is unavailable or data is malformed, just start blank.
+    }
+  }, []);
+
   async function handleSetup() {
     const trimmed = setupInput.trim();
     if (!trimmed || isSending) return;
 
+    const userInfo = { name, grade, major, aiExperience };
+    if (!isUserInfoComplete(userInfo)) {
+      setError("Please complete all required user information fields before starting.");
+      return;
+    }
+
     console.log(`EXPERIMENT SETUP: Mode = ${mode.toUpperCase()}, Role = ${role}`);
+
+    // Persist user info after validation succeeds.
+    try {
+      localStorage.setItem(USER_INFO_STORAGE_KEY, JSON.stringify(userInfo));
+    } catch {
+      // Non-fatal: allow setup to continue even if storage fails.
+    }
+
+
+    try {
+
+      const backRes = await fetch("/api/backend", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          codeVer: "1.1",
+          aiModel: "gemini-3-flash-preview",
+          company: "Google",
+          mode: mode,
+          role: mode === "role" ? role : "none",
+          name: name,
+          grade: grade,
+          major: major,
+          aiUse: aiExperience,
+        }),
+      });
+
+      const backData = await backRes.json().catch(() => null);
+      if (!backRes.ok) {
+        const message = data?.error?.message || `Request failed (${backRes.status})`;
+        throw new Error(message);
+      }
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unexpected error sending user info to backend.";
+      setError(msg);
+    }
 
     setError(null);
     setIsSending(true);
@@ -201,6 +296,85 @@ export default function Home() {
           <section className={styles.chat}>
             <div className={styles.setupForm}>
               <div className={styles.setupSection}>
+                <h2 className={styles.sectionTitle}>Your Information</h2>
+
+                <div className={styles.configGroup}>
+                  <label className={styles.configLabel} htmlFor="nameInput">
+                    Name
+                  </label>
+                  <input
+                    id="nameInput"
+                    className={styles.textarea}
+                    value={name}
+                    placeholder="Enter your name"
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isSending}
+                    required
+                    type="text"
+                  />
+                </div>
+
+                <div className={styles.configGroup}>
+                  <label className={styles.configLabel} htmlFor="gradeSelect">
+                    Grade
+                  </label>
+                  <select
+                    id="gradeSelect"
+                    className={styles.select}
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    disabled={isSending}
+                    required
+                  >
+                    <option value="" disabled>
+                      Select grade...
+                    </option>
+                    {GRADE_OPTIONS.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.configGroup}>
+                  <label className={styles.configLabel} htmlFor="majorInput">
+                    Major
+                  </label>
+                  <input
+                    id="majorInput"
+                    className={styles.textarea}
+                    value={major}
+                    placeholder="Enter your major"
+                    onChange={(e) => setMajor(e.target.value)}
+                    disabled={isSending}
+                    required
+                    type="text"
+                  />
+                </div>
+
+                <div className={styles.configGroup}>
+                  <label className={styles.configLabel}>AI Experience</label>
+                  <div className={styles.radioGroup}>
+                    {AI_EXPERIENCE_OPTIONS.map((opt) => (
+                      <label key={opt.id} className={styles.radioLabel}>
+                        <input
+                          type="radio"
+                          name="aiExperience"
+                          value={opt.id}
+                          checked={aiExperience === opt.id}
+                          onChange={(e) => setAiExperience(e.target.value)}
+                          disabled={isSending}
+                          required
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.setupSection}>
                 <h2 className={styles.sectionTitle}>Experiment Configuration</h2>
 
                 <div className={styles.configGroup}>
@@ -266,7 +440,7 @@ export default function Home() {
                 className={styles.primaryButton}
                 type="button"
                 onClick={handleSetup}
-                disabled={isSending || setupInput.trim().length === 0}
+                disabled={isSending || setupInput.trim().length === 0 || !isUserInfoCompleteValue}
               >
                 {isSending ? "Starting Experiment…" : "Start Experiment"}
               </button>
