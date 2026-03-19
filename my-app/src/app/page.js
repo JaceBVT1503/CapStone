@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
+import { HighlightableMessage } from "./HighlightableMessage";
+import { useHighlights } from "../lib/useHighlights";
 
 
 
@@ -60,8 +62,16 @@ export default function Home() {
   const [messages, setMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
+  const [showCommentsSidebar, setShowCommentsSidebar] = useState(true);
 
   const listRef = useRef(null);
+  const {
+    highlights,
+    addHighlight,
+    removeHighlight,
+    updateHighlight,
+    getHighlightsForMessage,
+  } = useHighlights();
 
   const activeRole = useMemo(() => ROLES.find((r) => r.id === role) ?? ROLES[0], [role]);
   const isUserInfoCompleteValue = isUserInfoComplete({ name, grade, major, aiExperience });
@@ -465,6 +475,9 @@ export default function Home() {
           </div>
 
           <div className={styles.controls}>
+            <button className={styles.ghostButton} type="button" onClick={() => setShowCommentsSidebar(!showCommentsSidebar)}>
+              {showCommentsSidebar ? "Hide" : "Show"} Comments
+            </button>
             <button className={styles.ghostButton} type="button" onClick={clearChat}>
               Clear
             </button>
@@ -478,7 +491,8 @@ export default function Home() {
           </div>
         ) : null}
 
-        <section className={styles.chat}>
+        <div className={styles.chatWrapper}>
+          <section className={styles.chat}>
           <div className={styles.messageList} ref={listRef} aria-label="Chat transcript">
             {messages.map((m) => (
               <div
@@ -491,7 +505,14 @@ export default function Home() {
                   <span className={styles.roleTag}>{m.role === "user" ? "You" : "Assistant"}</span>
                   <span className={styles.timeTag}>{formatTime(m.ts)}</span>
                 </div>
-                <div className={styles.bubble}>{m.content}</div>
+                <HighlightableMessage
+                  messageId={m.id}
+                  content={m.content}
+                  highlights={getHighlightsForMessage(m.id)}
+                  onAddHighlight={addHighlight}
+                  onRemoveHighlight={removeHighlight}
+                  onUpdateHighlight={updateHighlight}
+                />
               </div>
             ))}
           </div>
@@ -529,6 +550,68 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {showCommentsSidebar && (
+          <aside className={styles.sidebar}>
+            <div className={styles.sidebarHeader}>
+              <h2 className={styles.sidebarTitle}>Highlights & Comments</h2>
+            </div>
+            <div className={styles.sidebarContent}>
+              {messages.length === 0 ? (
+                <p className={styles.emptySidebar}>No messages yet. Start chatting to highlight and comment on text.</p>
+              ) : null}
+              {messages.map((message) => {
+                const msgHighlights = getHighlightsForMessage(message.id);
+                if (msgHighlights.length === 0) return null;
+                return (
+                  <div key={message.id} className={styles.messageHighlights}>
+                    <div className={styles.msgLabel}>
+                      <span className={styles.msgRole}>
+                        {message.role === "user" ? "Your message" : "Assistant"}
+                      </span>
+                      <span className={styles.msgTime}>{formatTime(message.ts)}</span>
+                    </div>
+                    <div className={styles.highlights}>
+                      {msgHighlights.map((highlight) => (
+                        <div key={highlight.id} className={styles.highlightCard}>
+                          <div
+                            className={styles.colorDot}
+                            style={{
+                              backgroundColor:
+                                highlight.color === "yellow"
+                                  ? "#fef3c7"
+                                  : highlight.color === "pink"
+                                  ? "#fbcfe8"
+                                  : highlight.color === "blue"
+                                  ? "#bfdbfe"
+                                  : "#bbf7d0",
+                            }}
+                          />
+                          <div className={styles.highlightDetails}>
+                            <p className={styles.highlightQuote}>
+                              "{message.content.substring(highlight.startOffset, highlight.endOffset)}"
+                            </p>
+                            {highlight.comment && (
+                              <p className={styles.highlightComment}>{highlight.comment}</p>
+                            )}
+                          </div>
+                          <button
+                            className={styles.removeHighlightBtn}
+                            onClick={() => removeHighlight(message.id, highlight.id)}
+                            title="Remove highlight"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+        )}
+        </div>
       </main>
     </div>
   );
