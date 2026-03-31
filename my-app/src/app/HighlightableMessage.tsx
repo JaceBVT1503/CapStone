@@ -1,39 +1,33 @@
-'use client';
+"use client";
 
-import { useRef, useState } from 'react';
-import styles from './HighlightableMessage.module.css';
+import { useRef, useState, type ReactNode } from "react";
+import styles from "./HighlightableMessage.module.css";
+import type { Highlight, HighlightColorId } from "../lib/useHighlights";
 
-const COLOR_OPTIONS = [
-  { id: 'yellow', label: 'Yellow', hex: '#fef3c7' },
-  { id: 'pink', label: 'Pink', hex: '#fbcfe8' },
-  { id: 'blue', label: 'Blue', hex: '#bfdbfe' },
-  { id: 'green', label: 'Green', hex: '#bbf7d0' },
+const COLOR_OPTIONS: { id: HighlightColorId; label: string; hex: string }[] = [
+  { id: "yellow", label: "Yellow", hex: "#fef3c7" },
+  { id: "pink", label: "Pink", hex: "#fbcfe8" },
+  { id: "blue", label: "Blue", hex: "#bfdbfe" },
+  { id: "green", label: "Green", hex: "#bbf7d0" },
 ];
 
-function getCharOffsetInText(node, offset) {
-  let charOffset = 0;
-
-  function traverse(n) {
-    if (n === node) {
-      return false;
-    }
-
-    if (n.nodeType === Node.TEXT_NODE) {
-      charOffset += n.textContent.length;
-    } else {
-      for (let child of n.childNodes) {
-        if (traverse(child)) return true;
-      }
-    }
-    return false;
-  }
-
-  traverse(node.parentElement);
-  if (node.nodeType === Node.TEXT_NODE) {
-    charOffset += offset;
-  }
-
-  return charOffset;
+export interface HighlightableMessageProps {
+  messageId: string;
+  content: string;
+  highlights?: Highlight[];
+  onAddHighlight: (
+    messageId: string,
+    startOffset: number,
+    endOffset: number,
+    color: HighlightColorId,
+    comment: string
+  ) => void;
+  onRemoveHighlight: (messageId: string, highlightId: string) => void;
+  onUpdateHighlight?: (
+    messageId: string,
+    highlightId: string,
+    updates: Partial<Highlight>
+  ) => void;
 }
 
 export function HighlightableMessage({
@@ -42,19 +36,22 @@ export function HighlightableMessage({
   highlights = [],
   onAddHighlight,
   onRemoveHighlight,
-}) {
-  const contentRef = useRef(null);
-  const [selectedText, setSelectedText] = useState('');
-  const [selectionRange, setSelectionRange] = useState(null);
+}: HighlightableMessageProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [selectedText, setSelectedText] = useState("");
+  const [selectionRange, setSelectionRange] = useState<{
+    startOffset: number;
+    endOffset: number;
+  } | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState("");
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
+    const selectedText = selection?.toString().trim() ?? "";
 
-    if (!selectedText || selection.rangeCount === 0) {
-      setSelectedText('');
+    if (!selectedText || !selection || selection.rangeCount === 0) {
+      setSelectedText("");
       setSelectionRange(null);
       setShowColorPicker(false);
       return;
@@ -65,41 +62,45 @@ export function HighlightableMessage({
       return;
     }
 
-    // Calculate start and end offsets within the message content
     let startOffset = 0;
     let endOffset = 0;
 
-    function countCharsBeforeNode(node, targetNode, offset) {
+    function countCharsBeforeNode(
+      node: Node,
+      targetNode: Node,
+      offset: number
+    ): number | null {
       let count = 0;
 
-      for (let child of node.childNodes) {
+      for (const child of Array.from(node.childNodes)) {
         if (child === targetNode) {
           return count + offset;
         }
 
         if (child.nodeType === Node.TEXT_NODE) {
-          count += child.textContent.length;
+          count += child.textContent?.length ?? 0;
         } else {
           const result = countCharsBeforeNode(child, targetNode, offset);
           if (result !== null) {
             return result;
           }
-          count += child.textContent.length;
+          count += child.textContent?.length ?? 0;
         }
       }
 
       return null;
     }
 
-    startOffset = countCharsBeforeNode(contentRef.current, range.startContainer, range.startOffset) || 0;
-    endOffset = countCharsBeforeNode(contentRef.current, range.endContainer, range.endOffset) || 0;
+    startOffset =
+      countCharsBeforeNode(contentRef.current, range.startContainer, range.startOffset) ?? 0;
+    endOffset =
+      countCharsBeforeNode(contentRef.current, range.endContainer, range.endOffset) ?? 0;
 
     if (startOffset === endOffset) {
       setShowColorPicker(false);
       return;
     }
 
-    // Ensure proper order
     if (startOffset > endOffset) {
       [startOffset, endOffset] = [endOffset, startOffset];
     }
@@ -109,7 +110,7 @@ export function HighlightableMessage({
     setShowColorPicker(true);
   };
 
-  const handleAddHighlight = (color) => {
+  const handleAddHighlight = (color: HighlightColorId) => {
     if (selectionRange && selectedText) {
       onAddHighlight(messageId, selectionRange.startOffset, selectionRange.endOffset, color, comment);
       cancelSelection();
@@ -118,10 +119,10 @@ export function HighlightableMessage({
 
   const cancelSelection = () => {
     setShowColorPicker(false);
-    setSelectedText('');
+    setSelectedText("");
     setSelectionRange(null);
-    setComment('');
-    window.getSelection().removeAllRanges();
+    setComment("");
+    window.getSelection()?.removeAllRanges();
   };
 
   const getHighlightedContent = () => {
@@ -129,29 +130,26 @@ export function HighlightableMessage({
       return content;
     }
 
-    // Sort highlights by startOffset
     const sortedHighlights = [...highlights].sort((a, b) => a.startOffset - b.startOffset);
 
-    const elements = [];
+    const elements: ReactNode[] = [];
     let lastIndex = 0;
 
     for (const highlight of sortedHighlights) {
       const { startOffset, endOffset, id, color } = highlight;
 
-      // Add text before highlight
       if (lastIndex < startOffset) {
         elements.push(content.substring(lastIndex, startOffset));
       }
 
-      // Add highlighted text
-      const colorHex = COLOR_OPTIONS.find((c) => c.id === color)?.hex || '#fef3c7';
+      const colorHex = COLOR_OPTIONS.find((c) => c.id === color)?.hex || "#fef3c7";
       elements.push(
         <span
           key={`highlight-${id}`}
           className={styles.highlighted}
           style={{ backgroundColor: colorHex }}
           data-highlight-id={id}
-          title={highlight.comment ? `Comment: ${highlight.comment}` : 'Highlighted'}
+          title={highlight.comment ? `Comment: ${highlight.comment}` : "Highlighted"}
         >
           {content.substring(startOffset, endOffset)}
         </span>
@@ -160,7 +158,6 @@ export function HighlightableMessage({
       lastIndex = endOffset;
     }
 
-    // Add remaining text
     if (lastIndex < content.length) {
       elements.push(content.substring(lastIndex));
     }
@@ -183,7 +180,7 @@ export function HighlightableMessage({
         <div className={styles.highlightToolbar}>
           <div className={styles.toolbarContent}>
             <div className={styles.selectedTextPreview}>
-              Selected: "<span className={styles.preview}>{selectedText.substring(0, 30)}</span>{selectedText.length > 30 ? '...' : ''}"
+              Selected: "<span className={styles.preview}>{selectedText.substring(0, 30)}</span>{selectedText.length > 30 ? "..." : ""}"
             </div>
 
             <div className={styles.colorButtons}>
@@ -194,6 +191,7 @@ export function HighlightableMessage({
                   style={{ backgroundColor: option.hex }}
                   onClick={() => handleAddHighlight(option.id)}
                   title={`Highlight as ${option.label}`}
+                  type="button"
                 />
               ))}
             </div>
@@ -209,6 +207,7 @@ export function HighlightableMessage({
             <button
               className={styles.cancelButton}
               onClick={cancelSelection}
+              type="button"
             >
               Cancel
             </button>
@@ -238,6 +237,7 @@ export function HighlightableMessage({
                 className={styles.deleteButton}
                 onClick={() => onRemoveHighlight(messageId, highlight.id)}
                 title="Remove highlight"
+                type="button"
               >
                 ✕
               </button>
