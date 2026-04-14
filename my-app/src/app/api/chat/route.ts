@@ -1,12 +1,13 @@
 import type { NextRequest } from "next/server";
 import { parseChatRequest } from "../../../lib/chatContract";
 import { getSystemPrompt } from "../../../lib/prompts";
-import { GoogleGenAI } from "@google/genai";
+import { OpenAI } from "openai";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ARC_API_KEY = process.env.ARC_API_KEY;
 
-const geminiAI = new GoogleGenAI({
-  apiKey: GEMINI_API_KEY,
+const arcClient = new OpenAI({
+  apiKey: ARC_API_KEY,
+  baseURL: "https://llm-api.arc.vt.edu/api/v1",
 });
 
 function json(body: unknown, init?: ResponseInit) {
@@ -17,11 +18,6 @@ function json(body: unknown, init?: ResponseInit) {
       ...(init?.headers ?? {}),
     },
   });
-}
-
-/** Minimal shape used from Gemini generateContent response */
-interface GeminiGenerateContentResult {
-  text?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -45,26 +41,68 @@ export async function POST(request: NextRequest) {
     return json({ error: parsed }, { status: 400 });
   }
 
-  const { message, mode, role } = parsed.value;
-  const systemPrompt = getSystemPrompt(mode, role);
+  const { message, mode, taskId, history } = parsed.value;
+  const systemPrompt = getSystemPrompt(mode, taskId);
 
-  const gemResponse = (await geminiAI.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: message,
-    config: {
-      systemInstruction: systemPrompt,
-    },
-  })) as GeminiGenerateContentResult;
+  try {
+    // Build messages array with system prompt + history + current message
+    const messages = [
+      {
+        role: "system" as const,
+        content: systemPrompt,
+      },
+      ...history.map((h) => ({
+        role: h.role === "user" ? ("user" as const) : ("assistant" as const),
+        content: h.content,
+      })),
+      {
+        role: "user" as const,
+        content: message,
+      },
+    ];
 
-  console.log("Here is the gemini response:", gemResponse.text);
+    const arcResponse = await arcClient.chat.completions.create({
+      model: "gpt-oss-120b",
+      messages,
+    });
 
-  return json({
-    assistant: { role: "assistant" as const, content: gemResponse.text },
-    meta: {
-      mode,
-      role: mode === "role" ? role : null,
-      stub: true,
-      promptPackage: gemResponse,
-    },
-  });
+    const responseText = arcResponse.choices[0]?.message?.content;
+
+    console.log("Here is the ARC/VT API response:", responseText);
+
+    if (!responseText) {
+      console.error("ARC/VT API returned no text:", arcResponse);
+      return json(
+        {
+          error: {
+            code: "invalid_response",
+            message: "ARC/VT API returned no content.",
+          },
+        },
+        { status: 500 }
+      );
+    }
+
+    return json({
+      assistant: { role: "assistant" as const, content: responseText },
+      meta: {
+        mode,
+        taskId: mode === "role" ? taskId : null,
+        stub: true,
+        promptPackage: arcResponse,
+      },
+    });
+  } catch (error) {
+    console.error("Error calling ARC/VT API:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return json(
+      {
+        error: {
+          code: "arc_error",
+          message: `Failed to call ARC/VT API: ${errorMessage}`,
+        },
+      },
+      { status: 500 }
+    );
+  }
 }

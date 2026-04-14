@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useStudyStore } from "@/store/study-store";
 import styles from "@/app/page.module.css";
-import type { ChatMode, RoleId } from "@/lib/prompts";
+import { TASKS } from "@/lib/prompts";
+import type { TaskId } from "@/lib/types";
+import type { Participant } from "@/lib/types";
 
 const GRADE_OPTIONS = [
   { id: "freshman", label: "Freshman" },
@@ -18,29 +20,13 @@ const AI_EXPERIENCE_OPTIONS = [
   { id: "no", label: "No" },
 ];
 
-const FOLLOW_UPS: { id: RoleId; label: string }[] = [
-  { id: "EmailCoach", label: "What is a company that you would be interested in working at?" },
-  { id: "ConceptCoach", label: "What is a subject that you know a lot about?" },
-];
-
-const ROLES: { id: RoleId; label: string }[] = [
-  { id: "MathTutor", label: "Math Tutor" },
-  { id: "WritingGrammarExpert", label: "Writing / Grammar Expert" },
-  { id: "SeniorSoftwareEngineerDebugger", label: "Senior Software Engineer (Debugging)" },
-  { id: "EmailCoach", label: "Write an email to a recruiter"},
-  { id: "ConceptCoach", label: "Explain something you know well"},
-  { id: "InvestmentPortfolio", label: "Develop an investment portfolio" },
-];
-
-
 function isUserInfoComplete(userInfo: {
   name?: string;
   grade?: string;
   major?: string;
   aiExperience?: string;
-  tasks?: RoleId[];
 } | null | undefined) {
-  const { name, grade, major, aiExperience, tasks } = userInfo ?? {};
+  const { name, grade, major, aiExperience } = userInfo ?? {};
   const trimmedName = typeof name === "string" ? name.trim() : "";
   const trimmedMajor = typeof major === "string" ? major.trim() : "";
   const gradeSet = new Set(GRADE_OPTIONS.map((g) => g.id));
@@ -48,24 +34,78 @@ function isUserInfoComplete(userInfo: {
   const isValidGrade = typeof grade === "string" && gradeSet.has(grade);
   const isValidAiExperience = aiExperience === "yes" || aiExperience === "no";
 
-  const isValidTasks = tasks && tasks.length === 2;
-  
-
-  return Boolean(trimmedName && trimmedMajor && isValidGrade && isValidAiExperience && isValidTasks);
+  return Boolean(trimmedName && trimmedMajor && isValidGrade && isValidAiExperience);
 }
 
+function selectRandomTasks(): [TaskId, TaskId] {
+  const shuffled = [...TASKS].sort(() => Math.random() - 0.5);
+  return [shuffled[0].id, shuffled[1].id];
+}
 
 export default function InitialPrompt() {
-
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
   const [major, setMajor] = useState("");
   const [aiExperience, setAiExperience] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [tasks, setStudyTasks] = useState<RoleId[]>([]);
-  const [followUpAnswers, setFollowUpAnswers] = useState<Partial<Record<RoleId, string>>>({});
-  const isUserInfoCompleteValue = isUserInfoComplete({ name, grade, major, aiExperience, tasks });
+
+  const setStep = useStudyStore((s) => s.setStep);
+  const setParticipant = useStudyStore((s) => s.setParticipant);
+  const setCurrentTaskIndex = useStudyStore((s) => s.setCurrentTaskIndex);
+  const setCurrentTaskId = useStudyStore((s) => s.setCurrentTaskId);
+  const setSelectedTasks = useStudyStore((s) => s.setSelectedTasks);
+  const clearChatHistory = useStudyStore((s) => s.clearChatHistory);
+  const clearSurveyResponses = useStudyStore((s) => s.clearSurveyResponses);
+
+  const isUserInfoCompleteValue = isUserInfoComplete({
+    name,
+    grade,
+    major,
+    aiExperience,
+  });
+
+  async function handleStart() {
+    setError(null);
+
+    if (!isUserInfoCompleteValue) {
+      setError("Please complete all required fields.");
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      // Select random tasks
+      const [taskOne, taskTwo] = selectRandomTasks();
+
+      // Create participant record
+      const participant: Participant = {
+        name: name.trim(),
+        grade,
+        major: major.trim(),
+        aiUse: aiExperience === "yes",
+        taskOne: null,
+        taskTwo: null,
+      };
+
+      // Save to store
+      setParticipant(participant);
+      setSelectedTasks([taskOne, taskTwo]);
+      setCurrentTaskIndex(0);
+      setCurrentTaskId(taskOne);
+      clearChatHistory();
+      clearSurveyResponses();
+
+      // Move to chat section for first task
+      setStep("chat-section");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unexpected error starting experiment.";
+      setError(msg);
+    } finally {
+      setIsSending(false);
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -73,10 +113,13 @@ export default function InitialPrompt() {
         <header className={styles.header}>
           <div className={styles.titleBlock}>
             <div className={styles.titleRow}>
-              <h1 className={styles.title}>AI Chatbot Experiment</h1>
+              <h1 className={styles.title}>AI Chatbot Study</h1>
               <span className={styles.badge}>Setup</span>
             </div>
-            <p className={styles.subtitle}>Configure the experiment and enter the initial prompt.</p>
+            <p className={styles.subtitle}>
+              Please complete the fields below to begin the experiment. Enter your information. 
+              When everything is filled out, continue to start.
+            </p>
           </div>
         </header>
 
@@ -148,7 +191,7 @@ export default function InitialPrompt() {
               </div>
 
               <div className={styles.configGroup}>
-                <label className={styles.configLabel}>AI Experience</label>
+                <label className={styles.configLabel}>Have you used AI before?</label>
                 <div className={styles.radioGroup}>
                   {AI_EXPERIENCE_OPTIONS.map((opt) => (
                     <label key={opt.id} className={styles.radioLabel}>
@@ -168,90 +211,17 @@ export default function InitialPrompt() {
               </div>
             </div>
 
-            <div className={styles.setupSection}>
-              <h2 className={styles.sectionTitle}>Task Configuration</h2>
-
-              <div className={styles.configGroup}>
-                <label className={styles.selectLabel} htmlFor="taskSelect">
-                  Select Two Tasks
-                </label>
-                <div className={styles.radioGroup}>
-                  {ROLES.map((r) => (
-                    <label key={r.id} className={styles.radioLabel}>
-                      <input
-                        type="checkbox"
-                        value={r.id}
-                        checked={tasks.includes(r.id)}
-                        disabled={isSending}
-                        onChange={(e) => {
-                          const { value, checked } = e.target;
-                          const roleId = value as RoleId;
-                          setStudyTasks((prev) => {
-                            if (checked) {
-                              if (prev.length < 2) {
-                                return [...prev, roleId];
-                              }
-                              return prev;
-                            }
-                            else {
-                              return prev.filter((id) => id !== roleId);
-                            }
-                          })
-                        }}
-                      >
-                      </input>
-                      <span>{r.label}</span>
-                    </label>
-
-                  ))}
-                </div>
-              </div>
-              {tasks.map((taskId) => {
-                const followUp = FOLLOW_UPS.find((f) => f.id === taskId);
-                if (followUp) {
-                  return (
-                    <div key={taskId} className={styles.configGroup}>
-                      <label className={styles.configLabel} htmlFor={`followUp-${taskId}`}>
-                        {followUp.label}
-                      </label>
-                      <input
-                        id={`followUp-${taskId}`}
-                        className={styles.textarea}
-                        type="text"
-                        value={followUpAnswers[taskId] || ""}
-                        placeholder="Enter your answer..."
-                        onChange={(e) =>
-                          setFollowUpAnswers((prev) => ({
-                            ...prev,
-                            [taskId]: e.target.value,
-                          }))
-                        }
-                        disabled={isSending}
-                        required
-                      />
-                    </div>
-                  );
-                }
-                return null;
-              })}
-
-
-            </div>
-
             <button
               className={styles.primaryButton}
               type="button"
-              //onClick={handleSetup}
+              onClick={handleStart}
               disabled={isSending || !isUserInfoCompleteValue}
             >
-              {isSending ? "Starting Experiment…" : "Start Experiment"}
+              {isSending ? "Starting Study…" : "Start Study"}
             </button>
           </div>
         </section>
       </main>
     </div>
   );
-
-
-
 }
