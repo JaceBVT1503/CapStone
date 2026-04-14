@@ -1,7 +1,7 @@
-import { isValidRoleId } from "./prompts";
+import type { TaskId } from "./types";
 import type { ChatMode } from "./prompts";
 
-export const MODES = ["plain", "role"] as const;
+export const MODES: readonly ChatMode[] = ["role", "no-role"] as const;
 
 export interface ChatHistoryItem {
   role: "user" | "assistant";
@@ -11,7 +11,7 @@ export interface ChatHistoryItem {
 export interface ChatRequest {
   message: string;
   mode: ChatMode;
-  role: string | null;
+  taskId: TaskId | null;
   history: ChatHistoryItem[];
 }
 
@@ -46,18 +46,9 @@ export function parseChatRequest(body: unknown): ParseResult {
   const mode: ChatMode =
     typeof o.mode === "string" && (MODES as readonly string[]).includes(o.mode)
       ? (o.mode as ChatMode)
-      : "plain";
+      : "no-role";
 
-  const role = o.role as string ?? null;
-  if (mode === "role" && !isValidRoleId(role)) {
-    return {
-      ok: false,
-      error: {
-        code: "invalid_role",
-        message: "Role is required when mode is 'role'.",
-      },
-    };
-  }
+  const taskId = (o.taskId as TaskId) ?? null;
 
   const historyRaw = Array.isArray(o.history) ? o.history : [];
   const history: ChatHistoryItem[] = historyRaw
@@ -72,5 +63,5 @@ export function parseChatRequest(body: unknown): ParseResult {
     })
     .filter((item): item is ChatHistoryItem => item !== null);
 
-  return { ok: true, value: { message, mode, role, history } };
+  return { ok: true, value: { message, mode, taskId, history } };
 }

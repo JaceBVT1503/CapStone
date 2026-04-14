@@ -3,6 +3,8 @@
   flex-direction: column;
   gap: 8px;
   position: relative;
+  width: auto;
+  max-width: 100%;
 }
 
 .bubble {
@@ -31,13 +33,11 @@
 }
 
 .highlightToolbar {
-  position: fixed;
   background: var(--surface, #ffffff);
   border: 1px solid var(--border, #e7e9ee);
   border-radius: 12px;
   padding: 12px;
   box-shadow: 0 10px 25px rgba(16, 24, 40, 0.1);
-  z-index: 1000;
   max-width: 280px;
   animation: slideUp 200ms ease;
 }

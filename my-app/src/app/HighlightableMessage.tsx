@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import styles from "./HighlightableMessage.module.css";
 import type { Highlight, HighlightColorId } from "../lib/useHighlights";
 
@@ -17,8 +17,7 @@ export interface HighlightableMessageProps {
   highlights?: Highlight[];
   onAddHighlight: (
     messageId: string,
-    startOffset: number,
-    endOffset: number,
+    selectedText: string,
     color: HighlightColorId,
     comment: string
   ) => void;
@@ -37,150 +36,139 @@ export function HighlightableMessage({
   onAddHighlight,
   onRemoveHighlight,
 }: HighlightableMessageProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [selectedText, setSelectedText] = useState("");
-  const [selectionRange, setSelectionRange] = useState<{
-    startOffset: number;
-    endOffset: number;
-  } | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [comment, setComment] = useState("");
+  const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null);
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
-    const selectedText = selection?.toString().trim() ?? "";
+    const selected = selection?.toString().trim() ?? "";
 
-    if (!selectedText || !selection || selection.rangeCount === 0) {
+    if (!selected) {
       setSelectedText("");
-      setSelectionRange(null);
       setShowColorPicker(false);
+      setToolbarPos(null);
+      return;
+    }
+
+    // Check if selection is within this message container
+    if (!containerRef.current || !selection?.rangeCount) {
       return;
     }
 
     const range = selection.getRangeAt(0);
-    if (!contentRef.current || !contentRef.current.contains(range.commonAncestorContainer)) {
+    if (!containerRef.current.contains(range.commonAncestorContainer)) {
       return;
     }
 
-    let startOffset = 0;
-    let endOffset = 0;
-
-    function countCharsBeforeNode(
-      node: Node,
-      targetNode: Node,
-      offset: number
-    ): number | null {
-      let count = 0;
-
-      for (const child of Array.from(node.childNodes)) {
-        if (child === targetNode) {
-          return count + offset;
-        }
-
-        if (child.nodeType === Node.TEXT_NODE) {
-          count += child.textContent?.length ?? 0;
-        } else {
-          const result = countCharsBeforeNode(child, targetNode, offset);
-          if (result !== null) {
-            return result;
-          }
-          count += child.textContent?.length ?? 0;
-        }
-      }
-
-      return null;
-    }
-
-    startOffset =
-      countCharsBeforeNode(contentRef.current, range.startContainer, range.startOffset) ?? 0;
-    endOffset =
-      countCharsBeforeNode(contentRef.current, range.endContainer, range.endOffset) ?? 0;
-
-    if (startOffset === endOffset) {
-      setShowColorPicker(false);
-      return;
-    }
-
-    if (startOffset > endOffset) {
-      [startOffset, endOffset] = [endOffset, startOffset];
-    }
-
-    setSelectedText(selectedText);
-    setSelectionRange({ startOffset, endOffset });
+    setSelectedText(selected);
     setShowColorPicker(true);
-  };
 
-  const handleAddHighlight = (color: HighlightColorId) => {
-    if (selectionRange && selectedText) {
-      onAddHighlight(messageId, selectionRange.startOffset, selectionRange.endOffset, color, comment);
-      cancelSelection();
+    // Get the position of the selection/mouse
+    const rects = range.getClientRects();
+    if (rects.length > 0) {
+      const rect = rects[rects.length - 1]; // Get the last rect (end of selection)
+      const x = rect.right + 10; // Offset from right edge of selection
+      const y = rect.top - 10; // Offset from top of selection
+
+      setToolbarPos({ x, y });
     }
   };
 
-  const cancelSelection = () => {
-    setShowColorPicker(false);
-    setSelectedText("");
-    setSelectionRange(null);
-    setComment("");
-    window.getSelection()?.removeAllRanges();
-  };
+  function handleAddHighlight(color: HighlightColorId) {
+    if (!selectedText) return;
+    onAddHighlight(messageId, selectedText, color, comment);
+    cancelSelection();
+  }
 
-  const getHighlightedContent = () => {
+  function cancelSelection() {
+    setSelectedText("");
+    setShowColorPicker(false);
+    setComment("");
+    setToolbarPos(null);
+    window.getSelection()?.removeAllRanges();
+  }
+
+  const renderHighlightedContent = (): React.ReactNode => {
     if (!highlights || highlights.length === 0) {
       return content;
     }
 
-    const sortedHighlights = [...highlights].sort((a, b) => a.startOffset - b.startOffset);
+    // Process highlights in order of appearance in the text
+    let sortedHighlights = [...highlights].sort((a, b) => {
+      return content.indexOf(a.selectedText) - content.indexOf(b.selectedText);
+    });
 
-    const elements: ReactNode[] = [];
-    let lastIndex = 0;
+    const parts: React.ReactNode[] = [];
+    let remaining = content;
 
     for (const highlight of sortedHighlights) {
-      const { startOffset, endOffset, id, color } = highlight;
+      const index = remaining.indexOf(highlight.selectedText);
+      if (index === -1) continue;
 
-      if (lastIndex < startOffset) {
-        elements.push(content.substring(lastIndex, startOffset));
+      // Add text before this highlight
+      if (index > 0) {
+        parts.push(remaining.substring(0, index));
       }
 
-      const colorHex = COLOR_OPTIONS.find((c) => c.id === color)?.hex || "#fef3c7";
-      elements.push(
+      // Add the highlight
+      const colorHex =
+        COLOR_OPTIONS.find((c) => c.id === highlight.color)?.hex || "#fef3c7";
+      const title = highlight.comment ? `Comment: ${highlight.comment}` : "Highlighted";
+
+      parts.push(
         <span
-          key={`highlight-${id}`}
+          key={`${highlight.id}-${Date.now()}`}
           className={styles.highlighted}
           style={{ backgroundColor: colorHex }}
-          data-highlight-id={id}
-          title={highlight.comment ? `Comment: ${highlight.comment}` : "Highlighted"}
+          data-highlight-id={highlight.id}
+          title={title}
         >
-          {content.substring(startOffset, endOffset)}
+          {highlight.selectedText}
         </span>
       );
 
-      lastIndex = endOffset;
+      // Move forward in remaining text
+      remaining = remaining.substring(index + highlight.selectedText.length);
     }
 
-    if (lastIndex < content.length) {
-      elements.push(content.substring(lastIndex));
+    // Add any remaining text
+    if (remaining) {
+      parts.push(remaining);
     }
 
-    return elements;
+    // Return wrapped in fragment
+    return <>{parts}</>;
   };
 
   return (
     <div className={styles.container}>
       <div
-        ref={contentRef}
+        ref={containerRef}
         className={styles.bubble}
         onMouseUp={handleTextSelection}
         onTouchEnd={handleTextSelection}
       >
-        {getHighlightedContent()}
+        {renderHighlightedContent()}
       </div>
 
-      {showColorPicker && selectedText && (
-        <div className={styles.highlightToolbar}>
+      {showColorPicker && selectedText && toolbarPos && (
+        <div
+          className={styles.highlightToolbar}
+          style={{
+            position: "fixed",
+            left: `${toolbarPos.x}px`,
+            top: `${toolbarPos.y}px`,
+            zIndex: 10000,
+          }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
           <div className={styles.toolbarContent}>
             <div className={styles.selectedTextPreview}>
-              Selected: "<span className={styles.preview}>{selectedText.substring(0, 30)}</span>{selectedText.length > 30 ? "..." : ""}"
+              Selected: "<span className={styles.preview}>{selectedText.substring(0, 30)}</span>
+              {selectedText.length > 30 ? "..." : ""}"
             </div>
 
             <div className={styles.colorButtons}>
@@ -189,7 +177,11 @@ export function HighlightableMessage({
                   key={option.id}
                   className={styles.colorButton}
                   style={{ backgroundColor: option.hex }}
-                  onClick={() => handleAddHighlight(option.id)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleAddHighlight(option.id);
+                  }}
                   title={`Highlight as ${option.label}`}
                   type="button"
                 />
@@ -202,11 +194,16 @@ export function HighlightableMessage({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={2}
+              onMouseDown={(e) => e.preventDefault()}
             />
 
             <button
               className={styles.cancelButton}
-              onClick={cancelSelection}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cancelSelection();
+              }}
               type="button"
             >
               Cancel
@@ -226,9 +223,7 @@ export function HighlightableMessage({
                 }}
               />
               <div className={styles.highlightContent}>
-                <div className={styles.highlightText}>
-                  {highlight.comment || content.substring(highlight.startOffset, highlight.endOffset)}
-                </div>
+                <div className={styles.highlightText}>{highlight.comment || highlight.selectedText}</div>
                 {highlight.comment && (
                   <div className={styles.highlightComment}>{highlight.comment}</div>
                 )}

@@ -258,7 +258,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: 100%;
+  max-width: 80%;
 }
 
 .messageMeta {
@@ -288,10 +288,13 @@
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-primary);
+  display: inline-block;
+  width: auto;
 }
 
 .userRow {
   align-items: flex-end;
+  align-self: flex-end;
 }
 
 .userRow .bubble {
@@ -718,5 +721,191 @@
 
   .messageList {
     min-height: auto;
+  }
+}
+
+/* Rating Scale Styles */
+.ratingScale {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.ratingScaleLabelLeft,
+.ratingScaleLabelRight {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  min-width: 100px;
+}
+
+.ratingScaleLabelLeft {
+  text-align: right;
+}
+
+.ratingScaleLabelRight {
+  text-align: left;
+}
+
+.ratingScaleInputs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.ratingOption {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.ratingOption input[type="radio"] {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  accent-color: var(--accent-2);
+  margin: 0;
+}
+
+.ratingOption input[type="radio"]:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.4);
+  outline-offset: 2px;
+}
+
+.ratingOption span {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Button Group Styles */
+.buttonGroup {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.buttonGroup .primaryButton {
+  margin: 0;
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Helper Text */
+.helperText {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* Completion Message */
+.completionMessage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.completionText {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.completionSubtext {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 60ch;
+}
+
+@media (max-width: 768px) {
+  .ratingScale {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ratingScaleLabelLeft {
+    text-align: left;
+    min-width: auto;
+  }
+
+  .ratingScaleLabelRight {
+    text-align: left;
+    min-width: auto;
+  }
+
+  .ratingScaleInputs {
+    gap: 6px;
+  }
+
+  .buttonGroup {
+    flex-direction: column;
+  }
+
+  .buttonGroup .primaryButton {
+    width: 100%;
+  }
+
+  .setupForm .primaryButton {
+    width: 100%;
+    align-self: stretch;
+  }
+}
+
+/* Loading Bubble Styles */
+.loadingBubble {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  width: fit-content;
+  min-height: 20px;
+}
+
+.loadingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.loadingDot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loadingDot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .loadingBubble {
+    background: rgba(255, 255, 255, 0.03);
   }
 }
