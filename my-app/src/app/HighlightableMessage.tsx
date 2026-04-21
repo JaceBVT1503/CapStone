@@ -20,7 +20,8 @@ export interface HighlightableMessageProps {
     startOffset: number,
     endOffset: number,
     color: HighlightColorId,
-    comment: string
+    comment: string,
+    text: string,
   ) => void;
   onRemoveHighlight: (messageId: string, highlightId: string) => void;
   onUpdateHighlight?: (
@@ -112,7 +113,7 @@ export function HighlightableMessage({
 
   const handleAddHighlight = (color: HighlightColorId) => {
     if (selectionRange && selectedText) {
-      onAddHighlight(messageId, selectionRange.startOffset, selectionRange.endOffset, color, comment);
+      onAddHighlight(messageId, selectionRange.startOffset, selectionRange.endOffset, color, comment, selectedText);
       cancelSelection();
     }
   };

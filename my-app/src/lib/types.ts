@@ -1,4 +1,7 @@
 
+import {GoogleGenAI} from '@google/genai';
+
+
 
 export interface Participant {
     name: string;
@@ -14,24 +17,38 @@ export interface AIStudy {
     company: string;
     aiModel: string;
     mode: string;
-    task: task;
+    task: string;
     history: AIHistory;
+    surveyResponse: SurveyResponse | null;
 }
 
 export interface AIHistory {
-    task: task;
+    task: string;
     initialQuestion: string;
-    followQuestion: string | null;
-    history: ChatHistory[];
+    messageLog: ChatMessage[] | null;
 }
 
-export interface ChatHistory {
-    prompt: string;
-    response: string;
-    hightlight: string;
-    comment: string;
+export interface ChatMessage {
+    content: string;
+    role: string;
+    hightlight: string | null;
+    comment: string | null;
+    id: string | null;
+    time: number | null;
 }
 
+export interface SurveyResponse {
+    finalAnswer: string; // file path or content
+    helpfulness: number; // 1-10
+    clarity: number; // 1-10
+    confidence: number; // 1-10
+    understanding: number; // 1-10
+    speed: number; // 1-10
+    satisfaction: number; // 1-10
+    likelyToUse: number; // 1-10
+    highlightHelpfulness?: number; // 1-10, optional
+    highlightReason?: string; // why they highlighted
+}
 
 export type WizardStep = 
     | "initial-prompt"
@@ -39,7 +56,8 @@ export type WizardStep =
     | "survey-section"
     | "second-prompt"
     | "second-chat"
-    | "second-survey";
+    | "second-survey"
+    | "completion-page";
 
 
 export type grade = 'Freshman' | 'Sophomore' | 'Junior' | 'Senior' | 'Other';

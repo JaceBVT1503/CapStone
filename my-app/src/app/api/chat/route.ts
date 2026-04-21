@@ -1,7 +1,8 @@
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { parseChatRequest } from "../../../lib/chatContract";
 import { getSystemPrompt } from "../../../lib/prompts";
 import { GoogleGenAI } from "@google/genai";
+import { createGemRole } from "@/utils/prompt-generator";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -9,62 +10,60 @@ const geminiAI = new GoogleGenAI({
   apiKey: GEMINI_API_KEY,
 });
 
-function json(body: unknown, init?: ResponseInit) {
-  return new Response(JSON.stringify(body), {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-}
 
-/** Minimal shape used from Gemini generateContent response */
-interface GeminiGenerateContentResult {
-  text?: string;
-}
+
 
 export async function POST(request: NextRequest) {
-  let body: unknown = null;
+
+  const body = await request.json();
+
   try {
-    body = await request.json();
-  } catch {
-    return json(
-      {
-        error: {
-          code: "invalid_json",
-          message: "Request body must be valid JSON.",
-        },
+
+    const { message, mode, task, history } = body;
+
+    const modelInstructions = mode == "role" ? createGemRole(task) : "";
+
+
+    const parsedHistory = history ? history.map((chat) => {
+      return {
+        role: chat.role,
+        parts: [{ text: chat.content }]
+      }
+    }) : [];
+
+    const chat = geminiAI.chats.create({
+      model: "gemini-3-flash-preview",
+      config: {
+        systemInstruction: modelInstructions
       },
-      { status: 400 }
+      history: parsedHistory,
+    });
+
+    const response = await chat.sendMessage({
+      message: message,
+    });
+
+    const responseText = response.text;
+
+    return NextResponse.json({
+      status: 200,
+      data: responseText,
+    });
+
+
+
+
+
+
+
+
+  } catch (error) {
+    const status = error?.status ?? 500;
+    return NextResponse.json(
+      { error: error?.message ?? "Unknown error" },
+      { status }
     );
   }
 
-  const parsed = parseChatRequest(body);
-  if (!parsed.ok) {
-    return json({ error: parsed }, { status: 400 });
-  }
 
-  const { message, mode, role } = parsed.value;
-  const systemPrompt = getSystemPrompt(mode, role);
-
-  const gemResponse = (await geminiAI.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: message,
-    config: {
-      systemInstruction: systemPrompt,
-    },
-  })) as GeminiGenerateContentResult;
-
-  console.log("Here is the gemini response:", gemResponse.text);
-
-  return json({
-    assistant: { role: "assistant" as const, content: gemResponse.text },
-    meta: {
-      mode,
-      role: mode === "role" ? role : null,
-      stub: true,
-      promptPackage: gemResponse,
-    },
-  });
 }

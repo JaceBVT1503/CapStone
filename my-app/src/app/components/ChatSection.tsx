@@ -1,11 +1,21 @@
 "use client";
 
 import styles from "@/app/page.module.css";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { GoogleGenAI } from "@google/genai";
+
 import { useHighlights, type Highlight } from "@/lib/useHighlights";
 import { HighlightableMessage } from "../HighlightableMessage";
 import type { ChatHistoryItem } from "@/lib/chatContract";
 import type { ChatMode, RoleId } from "@/lib/prompts";
+
+
+import type { AIStudy, AIHistory, ChatMessage } from "@/lib/types";
+//import { createChatbot } from "@/utils/prompt-generator";
+import { useStudyStore } from "@/store/study-store";
+
+
+
 
 
 type ChatApiResponseBody = {
@@ -13,20 +23,20 @@ type ChatApiResponseBody = {
   error?: { message?: string };
 };
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  ts: number;
-};
+// type ChatMessage = {
+//   id: string;
+//   role: "user" | "assistant";
+//   content: string;
+//   ts: number;
+// };
 
 
 const ROLES: { id: RoleId; label: string }[] = [
   { id: "MathTutor", label: "Math Tutor" },
   { id: "WritingGrammarExpert", label: "Writing / Grammar Expert" },
   { id: "SeniorSoftwareEngineerDebugger", label: "Senior Software Engineer (Debugging)" },
-  { id: "EmailCoach", label: "Write an email to a recruiter"},
-  { id: "ConceptCoach", label: "Explain something you know well"},
+  { id: "EmailCoach", label: "Write an email to a recruiter" },
+  { id: "ConceptCoach", label: "Explain something you know well" },
   { id: "InvestmentPortfolio", label: "Develop an investment portfolio" },
 ];
 
@@ -38,27 +48,39 @@ function formatTime(ts: number): string {
   }
 }
 
-export default function ChatSection() {
+interface ChatSectionParams {
+  studyNum: number
+};
+
+export default function ChatSection({ studyNum } : ChatSectionParams) {
+
+
+  const {
+    userObj,
+    currentStudy,
+    setStudyObj,
+    setStep,
+  } = useStudyStore();
+
+
+
+
+  //const [chatHistoryObj, setChatHistoryObj] = useState<ChatMessage[]>([]);
+
 
   const [showCommentsSidebar, setShowCommentsSidebar] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(currentStudy.history.messageLog);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [role, setRole] = useState<RoleId>(ROLES[0].id);
-  const [mode, setMode] = useState<ChatMode>("plain");
+  const [task, setTask] = useState(currentStudy.task);
+  const [mode, setMode] = useState(currentStudy.mode);
 
-  function clearChat() {
-    setError(null);
-    setMessages([
-      {
-        id: crypto.randomUUID(),
-        role: "assistant" as const,
-        content: "Chat cleared. Ask another question whenever you're ready.",
-        ts: Date.now(),
-      },
-    ]);
-  }
+
+
+
+
+
 
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -71,75 +93,91 @@ export default function ChatSection() {
   } = useHighlights();
 
 
+  function endStudy() {
+    setError(null);
+    console.log("Here are the highlights", highlights);
+
+    const finalChatLog: ChatMessage[] = messages.map((m) => {
+      const hl = getHighlightsForMessage(m.id!);
+      return {
+        content: m.content,
+        role: m.role,
+        hightlight: hl?.[0]?.text ?? null,
+        comment: hl?.[0]?.comment ?? null,
+        id: m.id,
+        time: m.time,
+      }
+    });
+
+    
+    const finalHistoryObj: AIHistory = {
+      ...currentStudy.history,
+      messageLog: finalChatLog,
+    };
+
+    const finalStudyObj: AIStudy = {
+      ...currentStudy,
+      history: finalHistoryObj
+    };
+
+    setStudyObj(finalStudyObj);
+    setStep("survey-section");
+
+  }
+
+
+
   async function sendMessage() {
     const trimmed = input.trim();
     if (!trimmed || isSending) return;
 
     setError(null);
     setIsSending(true);
+    setInput("");
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: trimmed,
-      ts: Date.now(),
+      time: Date.now(),
+      comment: null,
+      hightlight: null,
     };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
 
-    const history: ChatHistoryItem[] = messages
-      .slice(-12)
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .map((m) => ({ role: m.role, content: m.content }));
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        message: trimmed,
+        mode: mode,
+        task: task,
+        history: messages,
+      })
+    });
 
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          message: trimmed,
-          mode,
-          role: mode === "role" ? role : null,
-          history,
-        }),
-      });
+    const aiResponse = await res.json();
+    const aiMsg = {
 
-      const data = (await res.json().catch(() => null)) as ChatApiResponseBody | null;
-      if (!res.ok) {
-        const message = data?.error?.message || `Request failed (${res.status})`;
-        throw new Error(message);
-      }
-
-      const assistantText = data?.assistant?.content;
-      if (typeof assistantText !== "string" || assistantText.trim().length === 0) {
-        throw new Error("Invalid response from server.");
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant" as const,
-          content: assistantText,
-          ts: Date.now(),
-        },
-      ]);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unexpected error sending message.";
-      setError(msg);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant" as const,
-          content: "Sorry — something went wrong sending that message.",
-          ts: Date.now(),
-        },
-      ]);
-    } finally {
-      setIsSending(false);
+      id: crypto.randomUUID(),
+      role: "model",
+      hightlight: null,
+      comment: null,
+      content: aiResponse.data,
+      time: Date.now(),
     }
+
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      aiMsg,
+    ]);
+
+    
+    setIsSending(false);
+
+
   }
+
 
   return (
 
@@ -158,8 +196,8 @@ export default function ChatSection() {
             <button className={styles.ghostButton} type="button" onClick={() => setShowCommentsSidebar(!showCommentsSidebar)}>
               {showCommentsSidebar ? "Hide" : "Show"} Comments
             </button>
-            <button className={styles.ghostButton} type="button" onClick={clearChat}>
-              Clear
+            <button className={styles.ghostButton} type="button" onClick={endStudy}>
+              End Study
             </button>
           </div>
         </header>
@@ -182,7 +220,7 @@ export default function ChatSection() {
                 >
                   <div className={styles.messageMeta}>
                     <span className={styles.roleTag}>{m.role === "user" ? "You" : "Assistant"}</span>
-                    <span className={styles.timeTag}>{formatTime(m.ts)}</span>
+                    <span className={styles.timeTag}>{formatTime(m.time)}</span>
                   </div>
                   <HighlightableMessage
                     messageId={m.id}
@@ -248,7 +286,7 @@ export default function ChatSection() {
                         <span className={styles.msgRole}>
                           {message.role === "user" ? "Your message" : "Assistant"}
                         </span>
-                        <span className={styles.msgTime}>{formatTime(message.ts)}</span>
+                        <span className={styles.msgTime}>{formatTime(message.time)}</span>
                       </div>
                       <div className={styles.highlights}>
                         {msgHighlights.map((highlight: Highlight) => (

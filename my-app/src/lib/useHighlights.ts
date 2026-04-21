@@ -8,6 +8,7 @@ export interface Highlight {
   endOffset: number;
   color: HighlightColorId;
   comment: string;
+  text: string;
   createdAt: number;
 }
 
@@ -35,7 +36,8 @@ export function useHighlights() {
       startOffset: number,
       endOffset: number,
       color: HighlightColorId,
-      comment: string
+      comment: string,
+      text: string
     ) => {
       const highlightId = crypto.randomUUID();
       setHighlights((prev) => ({
@@ -48,6 +50,7 @@ export function useHighlights() {
             endOffset,
             color,
             comment,
+            text,
             createdAt: Date.now(),
           },
         ],
