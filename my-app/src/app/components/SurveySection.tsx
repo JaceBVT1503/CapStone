@@ -212,29 +212,28 @@ export default function SurveySection({ studyNum }: SurveySectionParams) {
               {SURVEY_QUESTIONS.map((question) => (
                 <div key={question.id} className={styles.configGroup}>
                   <label className={styles.configLabel}>{question.label}</label>
-                  <div className={styles.ratingScale}>
-                    <div className={styles.ratingScaleLabelLeft}>
-                      {question.scale.minLabel}
+                  <div className={styles.sliderContainer}>
+                    <div className={styles.sliderLabels}>
+                      <span className={styles.sliderLabelLeft}>
+                        {question.scale.minLabel}
+                      </span>
+                      <span className={styles.sliderValue}>
+                        {ratings[question.id] || "-"}
+                      </span>
+                      <span className={styles.sliderLabelRight}>
+                        {question.scale.maxLabel}
+                      </span>
                     </div>
-                    <div className={styles.ratingScaleInputs}>
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
-                        <label key={num} className={styles.ratingOption}>
-                          <input
-                            type="radio"
-                            name={question.id}
-                            value={num}
-                            checked={ratings[question.id] === num}
-                            onChange={(e) =>
-                              handleRatingChange(question.id, parseInt(e.target.value))
-                            }
-                          />
-                          <span>{num}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className={styles.ratingScaleLabelRight}>
-                      {question.scale.maxLabel}
-                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={ratings[question.id] || 0}
+                      onChange={(e) =>
+                        handleRatingChange(question.id, parseInt(e.target.value))
+                      }
+                      className={styles.slider}
+                    />
                   </div>
                 </div>
               ))}
@@ -247,25 +246,25 @@ export default function SurveySection({ studyNum }: SurveySectionParams) {
                 <label className={styles.configLabel} htmlFor="highlightHelpfulness">
                   How helpful was the portion of the response that you highlighted?
                 </label>
-                <div className={styles.ratingScale}>
-                  <div className={styles.ratingScaleLabelLeft}>Not helpful</div>
-                  <div className={styles.ratingScaleInputs}>
-                    {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
-                      <label key={num} className={styles.ratingOption}>
-                        <input
-                          type="radio"
-                          name="highlightHelpfulness"
-                          value={num}
-                          checked={highlightHelpfulness === num}
-                          onChange={(e) =>
-                            setHighlightHelpfulness(parseInt(e.target.value))
-                          }
-                        />
-                        <span>{num}</span>
-                      </label>
-                    ))}
+                <div className={styles.sliderContainer}>
+                  <div className={styles.sliderLabels}>
+                    <span className={styles.sliderLabelLeft}>Not helpful</span>
+                    <span className={styles.sliderValue}>
+                      {highlightHelpfulness || "-"}
+                    </span>
+                    <span className={styles.sliderLabelRight}>Extremely helpful</span>
                   </div>
-                  <div className={styles.ratingScaleLabelRight}>Extremely helpful</div>
+                  <input
+                    type="range"
+                    id="highlightHelpfulness"
+                    min="1"
+                    max="10"
+                    value={highlightHelpfulness || 0}
+                    onChange={(e) =>
+                      setHighlightHelpfulness(parseInt(e.target.value))
+                    }
+                    className={styles.slider}
+                  />
                 </div>
                 <small className={styles.helperText}>
                   Only answer if you highlighted text in the conversation.
