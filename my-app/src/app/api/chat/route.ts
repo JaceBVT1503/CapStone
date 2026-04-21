@@ -23,6 +23,9 @@ export async function POST(request: NextRequest) {
 
     const modelInstructions = mode == "role" ? createGemRole(task) : "";
 
+    const formatInstructions = modelInstructions
+      ? modelInstructions + ". Important: Format your response in plain text only..."
+      : "Important: Format your response in plain text only...";
 
     const parsedHistory = history ? history.map((chat) => {
       return {
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
     const chat = geminiAI.chats.create({
       model: "gemini-3.1-flash-lite-preview",
       config: {
-        systemInstruction: modelInstructions
+        systemInstruction: formatInstructions
       },
       history: parsedHistory,
     });
