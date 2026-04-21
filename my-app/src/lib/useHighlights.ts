@@ -4,11 +4,9 @@ export type HighlightColorId = "yellow" | "pink" | "blue" | "green";
 
 export interface Highlight {
   id: string;
-  startOffset: number;
-  endOffset: number;
+  selectedText: string; // The actual text that was highlighted
   color: HighlightColorId;
   comment: string;
-  text: string;
   createdAt: number;
 }
 
@@ -33,11 +31,9 @@ export function useHighlights() {
   const addHighlight = useCallback(
     (
       messageId: string,
-      startOffset: number,
-      endOffset: number,
+      selectedText: string,
       color: HighlightColorId,
-      comment: string,
-      text: string
+      comment: string
     ) => {
       const highlightId = crypto.randomUUID();
       setHighlights((prev) => ({
@@ -46,11 +42,9 @@ export function useHighlights() {
           ...(prev[messageId] || []),
           {
             id: highlightId,
-            startOffset,
-            endOffset,
+            selectedText,
             color,
             comment,
-            text,
             createdAt: Date.now(),
           },
         ],
