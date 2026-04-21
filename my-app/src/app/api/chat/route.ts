@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     }) : [];
 
     const chat = geminiAI.chats.create({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-flash-lite-preview",
       config: {
         systemInstruction: modelInstructions
       },
