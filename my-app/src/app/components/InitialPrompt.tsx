@@ -267,7 +267,7 @@ export default function InitialPrompt({ studyNum }: InitialPromptParams) {
                   </div>
 
                   <div className={styles.configGroup}>
-                    <label className={styles.configLabel}>AI Experience</label>
+                    <label className={styles.configLabel}>Do you have experience with AI?</label>
                     <div className={styles.radioGroup}>
                       {AI_EXPERIENCE_OPTIONS.map((opt) => (
                         <label key={opt.id} className={styles.radioLabel}>
