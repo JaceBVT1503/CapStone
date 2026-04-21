@@ -189,7 +189,7 @@ export default function ChatSection({ studyNum } : ChatSectionParams) {
               <h1 className={styles.title}>AI Chatbot</h1>
               <span className={styles.badge}>Chat</span>
             </div>
-            <p className={styles.subtitle}>Ask questions and chat with the assistant.</p>
+            <p className={styles.subtitle}>Please review the chatbot's response below. Highlight any text you want and add comments to explain your thoughts. You may continue the conversation with the chatbot by sending as many follow-up messages as you would like. When you are finished, please proceed by selecting 'End Study'.</p>
           </div>
 
           <div className={styles.controls}>

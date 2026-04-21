@@ -193,7 +193,7 @@ export default function InitialPrompt({ studyNum }: InitialPromptParams) {
               <h1 className={styles.title}>AI Chatbot Experiment</h1>
               <span className={styles.badge}>Setup</span>
             </div>
-            <p className={styles.subtitle}>Configure the experiment and enter the initial prompt.</p>
+            <p className={styles.subtitle}>{studyNum === 1 ? "Configure the experiment and select the initial task." : "Please select your second task below to continue the experiment. Once you have chosen a task, proceed to begin."}</p>
           </div>
         </header>
 
@@ -371,7 +371,7 @@ export default function InitialPrompt({ studyNum }: InitialPromptParams) {
 
                 <div className={styles.configGroup}>
                   <label className={styles.selectLabel} htmlFor="taskSelect">
-                    Select Two Tasks
+                    Select One Task
                   </label>
                   <div className={styles.radioGroup}>
                     {availableTasks.map((r) => (
