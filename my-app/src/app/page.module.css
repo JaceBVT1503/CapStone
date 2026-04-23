@@ -377,6 +377,14 @@
   opacity: 0.8;
 }
 
+/* Loading Disclaimer */
+.loadingDisclaimer {
+  margin-top: var(--spacing-md);
+  font-size: 0.875rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
 /* ===========================
    Chat Section
    =========================== */

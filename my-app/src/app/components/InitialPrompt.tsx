@@ -423,6 +423,11 @@ export default function InitialPrompt({ studyNum }: InitialPromptParams) {
               >
                 {isSending ? "Starting Experiment…" : "Start Experiment"}
               </button>
+              {isSending && (
+                <p className={styles.loadingDisclaimer}>
+                  Loading. Please do not close or refresh this page.
+                </p>
+              )}
             </div>
           </form>
         </section>
