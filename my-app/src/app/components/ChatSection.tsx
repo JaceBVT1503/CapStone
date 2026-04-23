@@ -102,7 +102,7 @@ export default function ChatSection({ studyNum } : ChatSectionParams) {
       return {
         content: m.content,
         role: m.role,
-        hightlight: hl?.[0]?.text ?? null,
+        hightlight: hl?.[0]?.selectedText ?? null,
         comment: hl?.[0]?.comment ?? null,
         id: m.id,
         time: m.time,
@@ -306,7 +306,7 @@ export default function ChatSection({ studyNum } : ChatSectionParams) {
                             />
                             <div className={styles.highlightDetails}>
                               <p className={styles.highlightQuote}>
-                                "{message.content.substring(highlight.startOffset, highlight.endOffset)}"
+                                "{highlight.selectedText}"
                               </p>
                               {highlight.comment && (
                                 <p className={styles.highlightComment}>{highlight.comment}</p>
