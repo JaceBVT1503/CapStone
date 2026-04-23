@@ -14,7 +14,6 @@ import type {
   Participant,
   AIStudy,
   AIHistory,
-  ChatHistory,
 } from "../lib/types";
 
 type ChatMessage = {
