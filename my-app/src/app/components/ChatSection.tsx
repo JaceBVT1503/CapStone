@@ -144,38 +144,76 @@ export default function ChatSection({ studyNum } : ChatSectionParams) {
       hightlight: null,
     };
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        message: trimmed,
-        mode: mode,
-        task: task,
-        history: messages,
-      })
-    });
+    try {
+      // Filter and validate history before sending - only include role and content
+      const validHistory = messages
+        .filter((msg) => msg.role && msg.content)
+        .map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }));
 
-    const aiResponse = await res.json();
-    const aiMsg = {
+      console.log("Sending message with history length:", validHistory.length);
 
-      id: crypto.randomUUID(),
-      role: "model",
-      hightlight: null,
-      comment: null,
-      content: aiResponse.data,
-      time: Date.now(),
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          message: trimmed,
+          mode: mode,
+          task: task,
+          history: validHistory,
+        })
+      });
+
+      // Read response
+      const aiResponse = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const errorMessage = aiResponse?.error?.message || `API error (${res.status})`;
+        throw new Error(errorMessage);
+      }
+      
+      // Validate response structure
+      if (!aiResponse || typeof aiResponse !== 'object') {
+        throw new Error("Invalid response format from API");
+      }
+
+      const responseText = aiResponse.data;
+      
+      // Check if we got valid text content
+      if (!responseText || typeof responseText !== 'string' || responseText.trim().length === 0) {
+        console.error("API returned empty or invalid text:", responseText);
+        throw new Error("AI returned an empty response. Please try again.");
+      }
+
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "model",
+        hightlight: null,
+        comment: null,
+        content: responseText,
+        time: Date.now(),
+      };
+
+      console.log("✓ Message received from AI:", responseText.substring(0, 100) + "...");
+
+      setMessages((prev) => [
+        ...prev,
+        userMsg,
+        aiMsg,
+      ]);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+      console.error("❌ Chat error:", errorMessage, err);
+      
+      setError(errorMessage);
+      
+      // Still add the user message so it's not lost
+      setMessages((prev) => [...prev, userMsg]);
+    } finally {
+      setIsSending(false);
     }
-
-    setMessages((prev) => [
-      ...prev,
-      userMsg,
-      aiMsg,
-    ]);
-
-    
-    setIsSending(false);
-
-
   }
 
 
