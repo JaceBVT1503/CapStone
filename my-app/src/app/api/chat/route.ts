@@ -73,19 +73,14 @@ export async function POST(request: NextRequest) {
     });
 
     // Extract text from the Gemini response
-    // The response can be either a string or have a text() method
+    // response.text is a getter property that returns the text content
     let responseText: string;
     
     if (typeof response === 'string') {
       responseText = response;
-    } else if (typeof response.text === 'function') {
-      responseText = response.text();
-    } else if (typeof response.text === 'string') {
+    } else if (typeof response?.text === 'string') {
+      // response.text is a string getter property from GenerateContentResponse
       responseText = response.text;
-    } else if (response.response?.text) {
-      responseText = response.response.text;
-    } else if (typeof response.response?.text === 'function') {
-      responseText = response.response.text();
     } else {
       console.error("Unexpected Gemini response structure:", response);
       throw new Error("Could not extract text from API response. Response structure: " + JSON.stringify(response));

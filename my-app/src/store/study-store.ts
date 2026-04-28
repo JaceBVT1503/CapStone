@@ -34,7 +34,7 @@ type StudyState = {
     studyNum: number;
     currentStudy: AIStudy | null;
 
-    currentSurveyResponse: SurveyResponse | null;
+    currentSurveyResponse: Partial<SurveyResponse> | null;
 
     
     
