@@ -9,6 +9,11 @@ export async function POST(request: NextRequest) {
   
   const { userObj, studyOne, studyTwo } = body;
 
+  // Log incoming data for research purposes
+  console.log("=== BACKEND DATA SUBMISSION ===");
+  console.log("User Object:", userObj);
+  console.log("Study One:", studyOne);
+  console.log("Study Two:", studyTwo);
 
   try {
 
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
           name: name,
           year: grade,
           major: major,
-          ai_knowledge: aiUse === "yes" ? true : false,
+          ai_knowledge: aiUse,
         },
       )
       .select("study_id")
@@ -34,6 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const studyId = userRow?.study_id;
+    console.log("✓ User inserted with study_id:", studyId);
 
     const parsedStudyOne = parseStudyMessages(studyOne, studyId, 1);
     const parsedStudyTwo = parseStudyMessages(studyTwo, studyId, 2);
@@ -47,9 +53,13 @@ export async function POST(request: NextRequest) {
       if (aiError) {
         throw aiError;
       }
+      console.log("✓ AI chat history inserted:", parsedChats.length, "messages");
     }
     const surveyOne = studyOne?.surveyResponse;
     const surveyTwo = studyTwo?.surveyResponse;
+
+    console.log("Survey One data:", surveyOne);
+    console.log("Survey Two data:", surveyTwo);
 
     const parsedSurveyOne = {
       survey_id: studyId,
@@ -81,6 +91,9 @@ export async function POST(request: NextRequest) {
       study_number: 2
     };
 
+    console.log("Parsed Survey One for DB:", parsedSurveyOne);
+    console.log("Parsed Survey Two for DB:", parsedSurveyTwo);
+
     const parsedSurveys = [parsedSurveyOne, parsedSurveyTwo];
 
     if (parsedSurveys.length > 0) {
@@ -92,19 +105,20 @@ export async function POST(request: NextRequest) {
         console.error("survey insert error", surveyError);
         throw surveyError;
       }
+      console.log("✓ Survey responses inserted successfully");
     }
 
     return NextResponse.json({
       status: 200
     });
 
-
-
-
-
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error("❌ Backend submission failed:", errorMessage);
+    console.error("Full error:", err);
+    
     return NextResponse.json(
-      { error: { code: "backend_failure", message: err } },
+      { error: { code: "backend_failure", message: errorMessage } },
       { status: 400 }
     );
   }

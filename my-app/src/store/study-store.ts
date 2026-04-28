@@ -91,7 +91,7 @@ export const useStudyStore = create<StudyState & StudyAction>((set, get) => ({
     setCurrentSurveyResponse: (key, value) =>
         set((state) => ({
             currentSurveyResponse: {
-                ...state.currentSurveyResponse,
+                ...(state.currentSurveyResponse || {}),
                 [key]: value,
             },
         })),
