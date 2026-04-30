@@ -1,4 +1,4 @@
-# Human-AI Interaction Experiment Platform
+# Role Prompting AI Experiment Platform
 
 ## Project Overview
 
