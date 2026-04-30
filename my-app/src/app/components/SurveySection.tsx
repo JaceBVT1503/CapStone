@@ -88,6 +88,28 @@ export default function SurveySection({ studyNum }: SurveySectionParams) {
     setError(null);
   }
 
+  function validateSurveyData(data: SurveyResponse): boolean {
+    // Validate required fields
+    if (!data.finalAnswer || typeof data.finalAnswer !== "string") return false;
+    
+    // Validate all required rating fields are numbers between 1-10
+    const requiredRatings = ["helpfulness", "clarity", "confidence", "understanding", "speed", "satisfaction", "likelyToUse"];
+    for (const field of requiredRatings) {
+      const value = data[field as keyof SurveyResponse];
+      if (typeof value !== "number" || value < 1 || value > 10) {
+        console.error(`Invalid rating for ${field}: ${value}`);
+        return false;
+      }
+    }
+
+    // Validate optional fields if present
+    if (data.highlightHelpfulness !== undefined && (typeof data.highlightHelpfulness !== "number" || data.highlightHelpfulness < 1 || data.highlightHelpfulness > 10)) {
+      return false;
+    }
+
+    return true;
+  }
+
   async function handleSubmit() {
     // Validate all required fields
     if (!finalAnswer.trim()) {
@@ -100,25 +122,7 @@ export default function SurveySection({ studyNum }: SurveySectionParams) {
       return;
     }
 
-    // Save survey responses to store
-    setCurrentSurveyResponse("finalAnswer", finalAnswer);
-    setCurrentSurveyResponse("helpfulness", ratings.helpfulness);
-    setCurrentSurveyResponse("clarity", ratings.clarity);
-    setCurrentSurveyResponse("confidence", ratings.confidence);
-    setCurrentSurveyResponse("understanding", ratings.understanding);
-    setCurrentSurveyResponse("speed", ratings.speed);
-    setCurrentSurveyResponse("satisfaction", ratings.satisfaction);
-    setCurrentSurveyResponse("likelyToUse", ratings.likelyToUse);
-
-    if (highlightHelpfulness !== null) {
-      setCurrentSurveyResponse("highlightHelpfulness", highlightHelpfulness);
-    }
-    if (highlightReason.trim()) {
-      setCurrentSurveyResponse("highlightReason", highlightReason);
-    }
-
-    //setSurveyToStudy(currentSurveyResponse);
-
+    // Build survey data locally to ensure all values are correct
     const surveyData: SurveyResponse = {
       finalAnswer,
       helpfulness: ratings.helpfulness,
@@ -132,33 +136,70 @@ export default function SurveySection({ studyNum }: SurveySectionParams) {
       ...(highlightReason.trim() && { highlightReason }),
     };
 
+    // Validate survey data before storing
+    if (!validateSurveyData(surveyData)) {
+      setError("Survey data validation failed. Please ensure all ratings are valid numbers.");
+      console.error("Invalid survey data:", surveyData);
+      return;
+    }
+
+    // Update the current study with survey response
     const updatedStudy = { ...currentStudy!, surveyResponse: surveyData };
     setStudyObj(updatedStudy);
 
+    // Log the data being saved for research purposes
+    console.log("Survey data collected for study", studyNum, ":", surveyData);
 
+    // If this is study 1, move to study 2
     if (studyNum === 1) {
       setStudyNum(2);
       setStep("initial-prompt");
       return;
     }
 
-    const snapshot = useStudyStore.getState();
+    // For study 2, submit all data to backend
+    try {
+      const snapshot = useStudyStore.getState();
 
-    const sendToBack = await fetch("/api/backend", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+      // Validate that we have both studies
+      if (!snapshot.studyOne || !snapshot.studyTwo) {
+        throw new Error("Missing study data. Both studies must be completed.");
+      }
+
+      // Validate user object
+      if (!snapshot.userObj) {
+        throw new Error("Missing user information.");
+      }
+
+      const backendPayload = {
         userObj: snapshot.userObj,
         studyOne: snapshot.studyOne,
         studyTwo: snapshot.studyTwo,
-      }),
-    })
+      };
 
-    const backendData = await sendToBack.json();
-    console.log("Here is the backend insert:", backendData);
-    
-    setError(null);
-    setStep("completion-page");
+      console.log("Sending data to backend:", backendPayload);
+
+      const sendToBack = await fetch("/api/backend", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(backendPayload),
+      });
+
+      if (!sendToBack.ok) {
+        const errorData = await sendToBack.json();
+        throw new Error(`Backend error: ${JSON.stringify(errorData)}`);
+      }
+
+      const backendData = await sendToBack.json();
+      console.log("Backend insert successful:", backendData);
+      
+      setError(null);
+      setStep("completion-page");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+      console.error("Failed to submit data to backend:", errorMessage);
+      setError(`Failed to save data: ${errorMessage}. Please try again or contact support.`);
+    }
   }
 
   return (
