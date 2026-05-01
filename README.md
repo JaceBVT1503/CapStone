@@ -42,25 +42,19 @@ npm install
 
 ### 3. Configure Environment Variables
 
-The repository includes a `.env.local` file in the `my-app` directory with the necessary API key configuration. No additional setup is required to run the application.
+You **must** create a `.env.local` file in the `my-app` directory with your API keys before running the application. This file is not included in the repository for security reasons.
 
-If you need to use different API keys or providers, you can modify the `.env.local` file:
+**Steps:**
+1. Copy the `.env.example` file to create your `.env.local` file:
+   ```bash
+   cp .env.example .env.local
+   ```
 
-```env
-# Choose ONE AI provider
-NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key_here
-# OR
-NEXT_PUBLIC_GOOGLE_GENAI_API_KEY=your_google_genai_api_key_here
-
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-You can obtain these keys from:
-- **OpenAI**: https://platform.openai.com/account/api-keys
-- **Google Gemini**: https://aistudio.google.com/apikey
-- **Supabase**: Your Supabase project dashboard
+2. Open the newly created `.env.local` file and replace all placeholder values with your actual API keys:
+   - **GEMINI_API_KEY**: Get from https://aistudio.google.com/apikey
+   - **PUBLIC_SUPABASE_URL**: Get from your Supabase project dashboard
+   - **PUBLIC_SUPABASE_ANON_KEY**: Get from your Supabase project dashboard
+   - **SUPABASE_SERVICE_ROLE_KEY**: Get from your Supabase project dashboard
 
 ### 4. Run the Development Server
 
@@ -114,7 +108,7 @@ my-app/
 - **React 19** - UI library
 - **TypeScript** - Type-safe JavaScript
 - **Supabase** - Database and authentication
-- **OpenAI / Google Gemini** - AI model providers
+- **Google Gemini** - AI model providers
 - **Zustand** - State management
 - **ESLint** - Code linting
 
@@ -127,7 +121,6 @@ my-app/
 | **next** | 16.1.7 | Core React framework providing server-side rendering, API routes, and optimized production builds |
 | **react** | 19.2.3 | UI library for building interactive components and managing component state |
 | **react-dom** | 19.2.3 | React package for rendering components to the browser DOM |
-| **@openai/openai** | 6.32.0 | Official OpenAI API client for accessing GPT models (language generation for AI assistant responses) |
 | **@google/genai** | 1.46.0 | Google Gemini API client for accessing Google's generative AI models (alternative AI provider) |
 | **@supabase/supabase-js** | 2.99.2 | Supabase JavaScript client for database operations, real-time features, and backend services (stores participant data, chat history, and study responses) |
 | **zustand** | 5.0.12 | Lightweight state management library for managing global application state (participant info, chat state, study progress) |
@@ -144,6 +137,5 @@ my-app/
 
 | Service | Purpose | Required Setup |
 |---|---|---|
-| **OpenAI API** | Powers the AI assistant with GPT language models for chat responses | Requires API key from https://platform.openai.com/account/api-keys |
 | **Google Gemini API** | Alternative AI provider using Google's generative models | Requires API key from https://aistudio.google.com/apikey |
 | **Supabase** | Backend database and services for storing participant data, chat history, and experiment responses | Requires Supabase project URL and anonymous key from Supabase dashboard |
